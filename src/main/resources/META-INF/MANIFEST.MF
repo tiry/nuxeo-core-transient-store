@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Bundle-Vendor: Nuxeo
+Bundle-ActivationPolicy: lazy
+Bundle-ClassPath: .
+Bundle-Name: org.nuxeo.core.transient.store
+Bundle-ManifestVersion: 2
+Nuxeo-Component: OSGI-INF/inmemory-cache-config.xml,
+ OSGI-INF/transientstore-service.xml
+Bundle-SymbolicName: org.nuxeo.core.transient.store
+
+
