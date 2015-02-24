@@ -1,5 +1,5 @@
 /*
- * (C) Copyright 2007-2010 Nuxeo SA (http://nuxeo.com/) and contributors.
+ * (C) Copyright 2015 Nuxeo SAS (http://nuxeo.com/) and contributors.
  *
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the GNU Lesser General Public License
@@ -12,7 +12,7 @@
  * Lesser General Public License for more details.
  *
  * Contributors:
- *     Florent Guillaume
+ * Nuxeo - initial API and implementation
  */
 package org.nuxeo.transientstore;
 
@@ -23,8 +23,15 @@ import org.nuxeo.ecm.core.work.AbstractWork;
 import org.nuxeo.ecm.core.work.api.WorkManager;
 import org.nuxeo.ecm.core.work.api.WorkManager.Scheduling;
 import org.nuxeo.runtime.api.Framework;
+import org.nuxeo.transientstore.api.TransientStore;
 import org.nuxeo.transientstore.api.TransientStoreService;
 
+/**
+ * Simple  Listener used to GC Work for {@link TransientStore}s
+ *
+ * @author <a href="mailto:tdelprat@nuxeo.com">Tiry</a>
+ * @since 7.2
+ */
 public class TransientStorageGCTrigger implements EventListener {
 
     public static final String EVENT = "transientStoreGCStart";

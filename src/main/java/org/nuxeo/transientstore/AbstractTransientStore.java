@@ -1,3 +1,20 @@
+/*
+ * (C) Copyright 2015 Nuxeo SAS (http://nuxeo.com/) and contributors.
+ *
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the GNU Lesser General Public License
+ * (LGPL) version 2.1 which accompanies this distribution, and is available at
+ * http://www.gnu.org/licenses/lgpl.html
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * Lesser General Public License for more details.
+ *
+ * Contributors:
+ * Nuxeo - initial API and implementation
+ */
+
 package org.nuxeo.transientstore;
 
 import java.io.File;
@@ -22,6 +39,12 @@ import org.nuxeo.transientstore.api.StorageEntry;
 import org.nuxeo.transientstore.api.TransientStore;
 import org.nuxeo.transientstore.api.TransientStoreConfig;
 
+/**
+ * Base class for {@link TransientStore} implementation.
+ *
+ * @author <a href="mailto:tdelprat@nuxeo.com">Tiry</a>
+ * @since 7.2
+ */
 public abstract class AbstractTransientStore implements TransientStore {
 
     protected final TransientStoreConfig config;
@@ -41,7 +64,7 @@ public abstract class AbstractTransientStore implements TransientStore {
 
     protected void initCaches() {
         CacheService cs = Framework.getService(CacheService.class);
-        if (cs==null) {
+        if (cs == null) {
             throw new UnsupportedOperationException("Cache service is required");
         }
         // register the caches
@@ -50,8 +73,8 @@ public abstract class AbstractTransientStore implements TransientStore {
         CacheDescriptor l1cd = config.getL1CacheConfig();
         CacheDescriptor l2cd = config.getL2CacheConfig();
         ExtensionImpl ext = new ExtensionImpl();
-        ext.setContributions(new Object[]{l1cd, l2cd});
-        ((CacheServiceImpl)cs).registerExtension(ext);
+        ext.setContributions(new Object[] { l1cd, l2cd });
+        ((CacheServiceImpl) cs).registerExtension(ext);
 
         l1cd.start();
         l2cd.start();
@@ -67,6 +90,8 @@ public abstract class AbstractTransientStore implements TransientStore {
 
     protected abstract long getStorageSize();
 
+    protected abstract void setStorageSize(long newSize);
+
     protected Cache getL1Cache() {
         return l1Cache;
     }
@@ -77,7 +102,7 @@ public abstract class AbstractTransientStore implements TransientStore {
 
     @Override
     public void put(StorageEntry entry) throws IOException {
-        if (config.getAbsoluteMaxSizeMB() < 0 || getStorageSize() < config.getAbsoluteMaxSizeMB()*(1024*1024)) {
+        if (config.getAbsoluteMaxSizeMB() < 0 || getStorageSize() < config.getAbsoluteMaxSizeMB() * (1024 * 1024)) {
             incrementStorageSize(entry);
             entry = persistEntry(entry);
             getL1Cache().put(entry.getId(), entry);
@@ -93,11 +118,11 @@ public abstract class AbstractTransientStore implements TransientStore {
 
     @Override
     public StorageEntry get(String key) throws IOException {
-        StorageEntry entry = (StorageEntry)getL1Cache().get(key);
-        if (entry==null) {
-            entry = (StorageEntry)getL2Cache().get(key);
+        StorageEntry entry = (StorageEntry) getL1Cache().get(key);
+        if (entry == null) {
+            entry = (StorageEntry) getL2Cache().get(key);
         }
-        if (entry!=null) {
+        if (entry != null) {
             entry.load(getCachingDirectory(key));
         }
         return entry;
@@ -105,14 +130,14 @@ public abstract class AbstractTransientStore implements TransientStore {
 
     @Override
     public void remove(String key) throws IOException {
-        StorageEntry entry = (StorageEntry)getL1Cache().get(key);
-        if (entry==null) {
-            entry = (StorageEntry)getL2Cache().get(key);
+        StorageEntry entry = (StorageEntry) getL1Cache().get(key);
+        if (entry == null) {
+            entry = (StorageEntry) getL2Cache().get(key);
             getL2Cache().invalidate(key);
         } else {
             getL1Cache().invalidate(key);
         }
-        if (entry!=null) {
+        if (entry != null) {
             decrementStorageSize(entry);
             entry.beforeRemove();
         }
@@ -120,10 +145,10 @@ public abstract class AbstractTransientStore implements TransientStore {
 
     @Override
     public void canDelete(String key) throws IOException {
-        StorageEntry entry = (StorageEntry)getL1Cache().get(key);
-        if (entry!=null) {
+        StorageEntry entry = (StorageEntry) getL1Cache().get(key);
+        if (entry != null) {
             getL1Cache().invalidate(key);
-            if (getStorageSize() <= config.getTargetMaxSizeMB()*(1024*1024) || config.getTargetMaxSizeMB() < 0) {
+            if (getStorageSize() <= config.getTargetMaxSizeMB() * (1024 * 1024) || config.getTargetMaxSizeMB() < 0) {
                 getL2Cache().put(key, entry);
             }
         }
@@ -141,10 +166,9 @@ public abstract class AbstractTransientStore implements TransientStore {
         return config;
     }
 
-
     @Override
     public int getStorageSizeMB() {
-        return (int) getStorageSize()/(1024*1024);
+        return (int) getStorageSize() / (1024 * 1024);
     }
 
     protected String getCachingDirName(String key) {
@@ -155,15 +179,16 @@ public abstract class AbstractTransientStore implements TransientStore {
         return dir;
     }
 
-    public File getCachingDirectory(String  key) {
+    public File getCachingDirectory(String key) {
         File cachingDir = new File(getCachingDirectory(), getCachingDirName(key));
         if (!cachingDir.exists()) {
             cachingDir.mkdir();
         }
         return cachingDir;
     }
+
     protected File getCachingDirectory() {
-        if (cacheDir==null) {
+        if (cacheDir == null) {
             File data = new File(Environment.getDefault().getData(), config.getName());
             if (data.exists()) {
                 try {
@@ -180,16 +205,19 @@ public abstract class AbstractTransientStore implements TransientStore {
 
     public void doGC() {
         File dir = getCachingDirectory();
+        long newSize = 0;
         try {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(Paths.get(dir.getAbsolutePath()))) {
-                for (Path entry: stream) {
+                for (Path entry : stream) {
                     String key = getKeyCachingDirName(entry.getFileName().toString());
                     try {
                         // XXX should not get entry since it can mess the LRU
-                        if (getL1Cache().get(key)!=null) {
+                        if (getL1Cache().hasEntry(key)) {
+                            newSize+= getSize(entry);
                             continue;
                         }
-                        if (getL2Cache().get(key)!=null) {
+                        if (getL2Cache().hasEntry(key)) {
+                            newSize+= getSize(entry);
                             continue;
                         }
                         FileUtils.deleteDirectory(entry.toFile());
@@ -202,24 +230,14 @@ public abstract class AbstractTransientStore implements TransientStore {
         } catch (IOException e) {
             log.error("Error while performing GC", e);
         }
+        setStorageSize(newSize);
+    }
 
-/*
-        for (String loc : dir.list()) {
-            File entryDir = new File(dir, loc);
-            if (entryDir.isDirectory()) {
-                String key = getKeyCachingDirName(loc);
-                try {
-                    if (getL1Cache().get(key)!=null) {
-                        continue;
-                    }
-                    if (getL2Cache().get(key)!=null) {
-                        continue;
-                    }
-                    FileUtils.deleteDirectory(entryDir);
-                } catch (IOException e) {
-                    log.error("Error while performing GC", e);
-                }
-            }
-        }*/
+    protected long getSize(Path entry) {
+        long size = 0;
+        for (File file : entry.toFile().listFiles()) {
+            size+=file.length();
+        }
+        return size;
     }
 }
